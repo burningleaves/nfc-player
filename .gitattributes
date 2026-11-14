@@ -1,0 +1,15 @@
+# 统一行尾: 文本文件用 LF (跨平台一致), 二进制文件不转换
+* text=auto eol=lf
+
+*.md   text eol=lf
+*.py   text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.html text eol=lf
+
+*.mp3  binary
+*.wav  binary
+*.m4a  binary
+*.flac binary
+*.ndef binary

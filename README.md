@@ -7,6 +7,19 @@
 
 ---
 
+## 线上地址
+
+| 用途 | 地址 |
+|---|---|
+| GitHub 仓库 | https://github.com/burningleaves/nfc-player |
+| GitHub Pages（备用托管，已跑通） | https://burningleaves.github.io/nfc-player/ |
+| 音频直链 | https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/<文件> |
+
+落地页在 `site/` 目录，通过 GitHub Actions 自动发布到 Pages。
+主托管推荐 EdgeOne Pages（国内实测 285ms），见 [docs/08_NFC碰一碰播歌.md](docs/08_NFC碰一碰播歌.md) 的 4.4。
+
+---
+
 ## 它是怎么工作的
 
 ```

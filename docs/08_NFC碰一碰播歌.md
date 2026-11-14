@@ -179,6 +179,16 @@ python tools/deploy.py
 
 这条命令会依次尝试 git push / edgeone CLI / vercel CLI。
 
+**本仓库已经内置 GitHub Actions**（`.github/workflows/deploy-pages.yml`），
+push 之后 GitHub Pages 会自动重新发布，地址：
+https://burningleaves.github.io/nfc-player/
+
+这是当前**已经跑通**的托管路径，可以直接当备用。
+
+> **推送失败时**：如果 `git push` 报 `Failed to connect to github.com:443`，
+> 说明你的网络阻断了 github.com 的 git 端点（但 api.github.com 通常还通）。
+> 此时用 GitHub REST API 提交，见本文末尾「推送失败时的替代路径」。
+
 ### 4.5 写 NFC 标签
 
 **方式 A（推荐，手机 App）**
@@ -308,4 +318,27 @@ nfc-player\
 | **多源回退（第一个 404 自动换第二个）** | **浏览器实测：显示「回退测试 2/2」** |
 | 未知 id 的错误提示 | 浏览器实测 |
 | 移动端 390px 布局 | 截图确认 |
+| GitHub Actions 自动发布 Pages | 实测 workflow success，线上 index.html + config.json 均 200 |
 | 真机 NFC 读写 + 出声 | 待你在真机上确认 |
+
+---
+
+## 十、推送失败时的替代路径
+
+有些网络会阻断 `github.com` 的 git 端点（但 `api.github.com` 仍然通）。
+实测表现：`git push` 报 `Failed to connect to github.com:443 after 21000 ms`。
+
+这时可以用 GitHub REST API 提交，完全绕开 git 协议：
+
+```powershell
+python tools/api_push.py
+```
+
+它会做三件事：
+
+1. 读取 `~/.git-credentials` 里已有的 PAT（不用重新输入密码）
+2. 把 `site/`、`tools/`、`audio/`、`docs/` 下的改动提交成一个 commit
+3. 推送前打印将要提交的文件列表让你确认
+
+> PAT 需要 `repo` 权限（如果仓库是公开的，`public_repo` 也够）。
+> 存在 `~/.git-credentials` 里的话，脚本会自动读取，不用额外配置。
