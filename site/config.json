@@ -1,0 +1,10 @@
+{
+  "site": "https://YOUR-DOMAIN",
+  "songs": [
+    {
+      "id": "mysong",
+      "title": "我的歌",
+      "url": "https://raw.githubusercontent.com/YOUR-USER/nfc-player/main/audio/song.mp3|https://cdn.jsdelivr.net/gh/YOUR-USER/nfc-player@main/audio/song.mp3"
+    }
+  ]
+}

@@ -1,0 +1,311 @@
+# 08 - NFC 碰一碰播歌（零服务器版）
+
+> 一张 NFC 标签贴在墙上 / 挂在包上，**安卓手机碰一下就播你指定的歌**。
+> 不需要服务器、不需要域名、不需要 App、不需要 NFC 读卡器硬件。
+
+---
+
+## 一、先看清楚它的能力边界
+
+| 你想要的 | 能不能 | 为什么 |
+|---|---|---|
+| 碰一下自动播放 | 需要点一下 | Chrome/WebView 的自动播放策略禁止「无用户手势」播放。NFC 跳转过去算导航，**不算手势** |
+| 完全离线播放 | 不行 | 音频托管在 GitHub 上，必须联网 |
+| 任意安卓手机都能用 | 可以 | 用浏览器打开，不需要装 App |
+| iPhone 也能用 | 需点一下 | iOS Safari 同样拦截自动播放 |
+| 一张卡放一首歌 / 多首歌 | 可以 | 每张卡一个短 ID，?id=xxx 区分 |
+| 锁屏时碰标签 | 不行 | Android 14+ 禁止后台 App 读 NFC |
+
+**实测结论（本项目已验证）**：
+
+- 自动播放被拦截时，页面自动降级为醒目的「播放」大按钮，一点即播
+- 第一次手动点过播放后，浏览器会记住该站点的「已交互」状态，
+  **之后再碰标签大概率能直接自动播**
+- 所以实际体验是：**第一次点一下，之后一碰就响**
+
+---
+
+## 二、整体架构
+
+```
+你的 mp3
+   |
+   |  提交到 GitHub 仓库的 audio/ 目录
+   v
+https://raw.githubusercontent.com/<你>/nfc-player/main/audio/song.mp3
+   |
+   |  写进 site/config.json
+   v
+config.json  { songs: [ { id: demo, url: <上面那个直链> } ] }
+   |
+   |  推送到 GitHub -> 托管平台自动部署
+   v
+https://<你的域名>/
+   |
+   |  写进 NFC 标签（NDEF URI，约 40 字节）
+   v
+NFC 标签
+```
+
+**分工**：GitHub 当**仓库**（存代码和音频），托管平台只托管**落地页 HTML**。
+两者都零成本、零运维。
+
+| 组件 | 选型 | 实测延迟 |
+|---|---|---|
+| 落地页托管 | **EdgeOne Pages**（腾讯云） | 285 ms |
+| 落地页托管（备选） | Vercel | 323 ms |
+| ~~落地页托管~~ | ~~Cloudflare Pages~~ | ~~15414 ms 已排除~~ |
+| 音频直链 | **raw.githubusercontent.com** | 757 ms |
+| 音频直链（回退） | cdn.jsdelivr.net/gh/ | 709 ms |
+| ~~音频直链~~ | ~~releases/download~~ | ~~302 跳 objects.githubusercontent.com，25s 超时 已排除~~ |
+
+### 为什么音频不用 Release 资产
+
+`releases/download/` 会 302 跳到 `objects.githubusercontent.com`，
+这个域名在国内实测 **25 秒超时**。而 `raw.githubusercontent.com`
+走的是另一条 CDN 路径，只要 757 ms，且 **支持 Range**（可拖进度）、
+MIME 正确（`audio/mpeg`）。
+
+代价是 raw 单文件上限 100 MB —— 一首歌远远够用。
+
+### 多源回退（重要）
+
+`config.json` 里的 `url` 支持用 `|` 分隔多个候选源：
+
+```json
+{
+  "id": "mysong",
+  "title": "我的歌",
+  "url": "https://raw.githubusercontent.com/<你>/nfc-player/main/audio/song.mp3|https://cdn.jsdelivr.net/gh/<你>/nfc-player@main/audio/song.mp3"
+}
+```
+
+第一个源加载失败会自动换第二个，界面上会显示「标题 2/2」告诉你用的是第几个。
+**任何单一 CDN 抽风都不会导致播不出来。**
+
+---
+
+## 三、准备材料
+
+- [ ] 一个 GitHub 账号
+- [ ] 一张 **NTAG213** 标签（淘宝搜「NFC 标签 NTAG213 13.56MHz」，几块钱一片）
+      - NTAG213 = 144 字节，够用；NTAG215 = 504 字节，也行
+      - 认准 **13.56MHz ISO 14443A**，别买 UHF 848MHz（手机读不了）
+- [ ] 一部安卓手机（用来写标签）
+- [ ] 你的 mp3 文件
+
+---
+
+## 四、步骤
+
+### 4.1 建仓库
+
+```
+仓库: nfc-player
+  site/      <- 落地页 (index.html + config.json)
+  audio/     <- 你的 mp3
+  tools/     <- 脚本
+  docs/      <- 文档
+```
+
+### 4.2 放音频
+
+把你的 mp3 放进 `audio/`，文件名用英文（不要中文和空格）：
+
+```
+audio/song.mp3
+```
+
+提交后直链就是：
+
+```
+https://raw.githubusercontent.com/<你>/nfc-player/main/audio/song.mp3
+```
+
+> 分支名不是 main 的话要同步改。
+> 注意用 **raw** 直链，**不要**用 `releases/download`（慢 25 秒，见上）。
+
+### 4.3 生成配置
+
+```powershell
+cd D:\OpenWrt\nfc-player
+
+python tools/make_config.py `
+  --site "https://<你的域名>" `
+  --song "我的歌=https://raw.githubusercontent.com/<你>/nfc-player/main/audio/song.mp3|https://cdn.jsdelivr.net/gh/<你>/nfc-player@main/audio/song.mp3" `
+  --short mysong
+```
+
+输出会写好 `site/config.json`，并打印要写进标签的短 URL：
+
+```
+https://<你的域名>/?id=mysong
+```
+
+多首歌就多写几个 `--song` 和 `--short`：
+
+```powershell
+python tools/make_config.py `
+  --site "https://<你的域名>" `
+  --song "歌A=https://.../a.mp3" --song "歌B=https://.../b.mp3" `
+  --short a --short b
+```
+
+### 4.4 部署落地页
+
+**方式 A：EdgeOne Pages（推荐，腾讯云，国内快）**
+
+1. 打开 https://console.cloud.tencent.com/edgeone/pages
+2. 新建项目 -> 选择 **GitHub** 作为代码源 -> 授权并选 `nfc-player` 仓库
+3. 构建配置：**构建命令留空**，**输出目录填 `site`**
+4. 部署完成，拿到 `xxx.edgeone.app` 域名
+5. 需要自有域名的话在项目里加 CNAME 记录
+
+**方式 B：Vercel**
+
+```powershell
+npm i -g vercel
+vercel --prod --yes site
+```
+
+**方式 C：GitHub push 自动部署**
+
+在 EdgeOne / Vercel 后台把仓库绑上（方式 A 的第 2 步），
+之后每次改完 config.json，只要 push 就会自动重新部署：
+
+```powershell
+python tools/deploy.py
+```
+
+这条命令会依次尝试 git push / edgeone CLI / vercel CLI。
+
+### 4.5 写 NFC 标签
+
+**方式 A（推荐，手机 App）**
+
+1. 安卓手机装 **NFC Tools**（或 *NDEF Tag Editor* / *NFC Tag Writer*）
+2. 打开 App -> 新建记录 -> 类型选 **URI/网址**
+3. 粘贴短 URL
+4. 保存
+5. **手机背面贴近标签**，App 提示写入成功
+
+**方式 B（十六进制）**
+
+```powershell
+python tools/nfc_write.py "https://<你的域名>/?id=mysong"
+```
+
+会打印 HEX，用支持十六进制输入的 App 粘贴。
+
+**方式 C（PC + USB NFC 读卡器）**
+
+把生成的 `tools/tag.ndef` 用 nfcpy / NFC Tools CLI 写到标签。
+
+### 4.6 验收
+
+```powershell
+python tools/deploy_check.py --site "https://<你的域名>"
+```
+
+会检查：落地页完整性、config 合法性、**每个音频直链是否真的能访问、
+是否支持 Range、实测延迟**，以及每张标签的 NDEF 字节数。
+
+延迟超过 3 秒会标「慢!」，提示你换源或加回退。
+
+---
+
+## 五、多张卡 / 多首歌
+
+每首歌一个短 ID，一张卡一个 ID：
+
+| 标签 | 写入的 URL | 效果 |
+|---|---|---|
+| 客厅那张 | ?id=living | 碰一下播客厅歌单 |
+| 车里那张 | ?id=car | 碰一下播车里歌单 |
+| 床头那张 | ?id=sleep | 碰一下播助眠曲 |
+
+改歌单只要改 `config.json` 重新推送，**标签不用重写**。
+
+---
+
+## 六、常见问题
+
+**Q：碰标签后没反应 / 页面空白**
+- 手机 NFC 开着吗？
+- 标签是 13.56MHz 的吗？（有些便宜货是 125kHz 的）
+- 浏览器弹了「是否允许打开此应用」吗？点允许
+
+**Q：页面打开了但没有声音**
+- 看是不是停在「点一下开始播放」——**这是自动播放被拦截，点一下就好**
+- 第一次手动播放后，之后再碰一般就自动播了
+
+**Q：显示「音频加载失败」**
+- 跑 `deploy_check.py` 看是哪个源挂了
+- 如果所有源都挂了，多半是文件名有中文或空格，或者音频没 commit 上去
+
+**Q：界面上显示「我的歌 2/2」是什么意思**
+- 说明第一个源（raw.githubusercontent）失败了，系统自动用了第二个（jsDelivr）
+- 说明网络对 GitHub 不太友好，但不影响播放
+
+**Q：进度条拖不动 / 时长显示不出来**
+- 直链不支持 Range。自建源必须让服务器返回 `Accept-Ranges: bytes`
+
+**Q：能不能离线圈？**
+- 不能。音频在 GitHub 上，必须联网。
+  要真正离线，只能把音频打包进一个 App 里（见下方「离线变体」）。
+
+---
+
+## 七、离线变体（可选）
+
+```
+音频 -> 打包进 APK（res/raw/）
+标签 -> 写 mymusic://track/1
+App  -> 监听该 scheme -> 播放内置音频
+```
+
+- 代价：换歌要重新打包 APK
+- 好处：真离线、无需任何服务器
+- 局限：每台手机都要装这个 App；Android 14+ 锁屏时碰标签不触发
+
+---
+
+## 八、工具清单
+
+```
+nfc-player\
+├── site\
+│   ├── index.html          落地页播放器（单文件，无依赖）
+│   └── config.json        短 ID -> 音频直链 映射
+├── audio\                 你的 mp3 放这里
+├── tools\
+│   ├── make_config.py     生成 config.json + 打印标签 URL
+│   ├── nfc_write.py       生成 NDEF URI 记录（十六进制 + .ndef 文件）
+│   ├── deploy_check.py    部署自检（含直链 Range 与延迟实测）
+│   └── deploy.py          一键部署（git push / edgeone / vercel）
+├── docs\08_NFC碰一碰播歌.md   本文件
+└── vercel.json            Vercel 部署配置（备用托管）
+```
+
+四个脚本都**零第三方依赖**，标准库 Python 3 即可运行。
+
+---
+
+## 九、已验证事项
+
+| 项 | 状态 |
+|---|---|
+| NDEF URI 记录编码（含前缀缩写） | 单元验证，NTAG213 容量内（约 40 字节） |
+| raw.githubusercontent 直链 Range + MIME | 实测 206 / audio/mpeg |
+| jsDelivr `gh/` 路径 Range | 实测 206 |
+| GitHub Release 资产直链 | 实测 25s 超时 -> 已排除 |
+| EdgeOne Pages 落地页 | 实测 285 ms |
+| Vercel 落地页 | 实测 323 ms |
+| Cloudflare Pages 落地页 | 实测 15414 ms -> 已排除 |
+| 落地页 config.json 解析 | 浏览器实测 |
+| 播放推进 / 结束 / 重播 | 浏览器实测（0:00 -> 0:03 -> 播放完毕） |
+| 自动播放被拦截时的降级按钮 | 浏览器实测 |
+| **多源回退（第一个 404 自动换第二个）** | **浏览器实测：显示「回退测试 2/2」** |
+| 未知 id 的错误提示 | 浏览器实测 |
+| 移动端 390px 布局 | 截图确认 |
+| 真机 NFC 读写 + 出声 | 待你在真机上确认 |

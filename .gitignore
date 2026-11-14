@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+
+# 工具运行产物
+tools/tag.ndef
+tools/*.ndef
+
+# 测试/临时文件
+site/test-tone.wav
+site/_mobile_test*.html
+*.tmp
+
+# 本地配置（含你的真实直链，不应进仓库）
+site/config.local.json
