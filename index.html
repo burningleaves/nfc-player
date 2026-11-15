@@ -278,38 +278,88 @@
   });
 
   au.addEventListener("error", function () {
-    if (candIdx < candidates.length) {
-      // 还有备选源, 静默切换
-      tryNext();
+    // 重要: play() 被浏览器拦截(自动播放策略)时, 媒体元素也会触发 error 事件。
+    // 如果不区分, 就会误判成"这个源坏了"而切到下一个源, 把所有源切一遍后
+    // 显示"音频加载失败" —— 但其实只是需要用户点一下。
+    // 判断依据: 错误来自网络/解码 (MEDIA_ERR_SRC_NOT_SUPPORTED / MEDIA_ERR_NETWORK)
+    // 而不是 NotAllowedError。
+    if (au.error && au.error.code === au.error.MEDIA_ERR_ABORTED) {
+      return;   // 用户主动中止, 忽略
+    }
+    if (au.error && (au.error.code === au.error.MEDIA_ERR_DECODE ||
+                     au.error.code === au.error.MEDIA_ERR_SRC_NOT_SUPPORTED ||
+                     au.error.code === au.error.MEDIA_ERR_NETWORK)) {
+      if (candIdx < candidates.length) {
+        tryNext();   // 真的坏了, 换下一个源
+        return;
+      }
+      disc.classList.remove("spin");
+      showErr("音频加载失败：直链可能已失效，或该地址不允许跨域播放。\n" + raw);
       return;
     }
+    // 没有 error 对象 —— 多半是 play() 被拒, 交给 start() 里的 catch 处理
     disc.classList.remove("spin");
-    showErr("音频加载失败：直链可能已失效，或该地址不允许跨域播放。\n" + raw);
   });
 
   // ---- 播放控制 --------------------------------------------------------
+  var autoplayBlocked = false;
+
+  function showPlayBtn(reason) {
+    disc.classList.remove("spin");
+    playing = false;
+    title.textContent = "点一下开始播放";
+    btn.classList.remove("hidden");
+    btn.textContent = "▶ 播放";
+    if (reason) {
+      hint.innerHTML = reason;
+    }
+  }
+
   function start() {
     // 标题由 "playing" 事件来设, 这里不抢
     var p = au.play();
     if (p && p.catch) {
-      p.catch(function () {
+      p.catch(function (err) {
         // 自动播放被拦截 —— 退到「需要点一下」路径
-        disc.classList.remove("spin");
-        playing = false;
-        title.textContent = "点一下开始播放";
-        btn.classList.remove("hidden");
-        btn.textContent = "▶ 播放";
-        hint.innerHTML = "浏览器拦截了自动播放（Chrome / WebView 常见）。<br>点上面的按钮即可开始。";
+        autoplayBlocked = true;
+        var name = (err && err.name) ? err.name : "UnknownError";
+        if (name === "NotAllowedError") {
+          showPlayBtn("浏览器拦截了自动播放（Chrome 策略）。<br>点上面的按钮即可开始播放。");
+        } else {
+          showPlayBtn("自动播放失败（" + name + "）。<br>点上面的按钮重试。");
+        }
       });
     }
+    // 保险: 1.5 秒后如果还没开始播且按钮没显示, 强制显示
+    setTimeout(function () {
+      if (au.paused && btn.classList.contains("hidden") && !playing) {
+        showPlayBtn("点击下面的按钮开始播放。");
+      }
+    }, 1500);
   }
 
   btn.addEventListener("click", function () {
     btn.classList.add("hidden");
-    au.play().catch(function () {
-      showErr("播放被拒绝，请再点一次。");
-      btn.classList.remove("hidden");
-    });
+    // 移动端浏览器上, 音频还没缓冲完就 play() 可能直接 reject。
+    // 先等 canplay 再播, 更稳。
+    function doPlay() {
+      var p = au.play();
+      if (p && p.catch) {
+        p.catch(function (err) {
+          var name = (err && err.name) ? err.name : "UnknownError";
+          showPlayBtn("播放被拒绝（" + name + "），请再点一次。");
+        });
+      }
+    }
+    if (au.readyState >= 2) {
+      doPlay();
+    } else {
+      au.addEventListener("canplay", doPlay, { once: true });
+      au.load();
+      setTimeout(function () {
+        if (au.paused) doPlay();
+      }, 1200);
+    }
   });
 
   replay.addEventListener("click", function () {
