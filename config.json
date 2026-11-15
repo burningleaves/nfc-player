@@ -1,0 +1,10 @@
+{
+  "site": "https://nfc-player-dpre48ptcgkc.edgeone.cool",
+  "songs": [
+    {
+      "id": "love",
+      "title": "爱情悬崖",
+      "url": "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a"
+    }
+  ]
+}

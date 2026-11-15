@@ -160,7 +160,13 @@
         cb(hit.url, hit.title || "");
       })
       .catch(function (e) {
-        fail("读取 config.json 失败: " + e.message);
+        var msg = "读取 config.json 失败: " + e.message;
+        // 404 通常意味着: 输出目录设错, 或该文件没被部署
+        if (String(e.message).indexOf("404") >= 0) {
+          msg += "\n\n如果这是 404, 说明托管平台的输出目录配置不对。\n" +
+                 "应该填 site (或根目录), 且 site/config.json 必须存在。";
+        }
+        fail(msg);
       });
   }
 

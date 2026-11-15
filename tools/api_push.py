@@ -123,7 +123,8 @@ def collect_files():
                 if rel.startswith('site/') and rel.endswith('.wav'):
                     continue
                 files[rel] = open(fp, 'rb').read()
-    for f in ('README.md', 'vercel.json', '.gitignore', '.gitattributes'):
+    for f in ('README.md', 'vercel.json', '.gitignore', '.gitattributes',
+              'index.html', 'config.json'):
         fp = os.path.join(ROOT, f)
         if os.path.isfile(fp):
             files[f] = open(fp, 'rb').read()
