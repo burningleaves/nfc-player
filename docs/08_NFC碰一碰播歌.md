@@ -185,6 +185,91 @@ https://burningleaves.github.io/nfc-player/
 
 这是当前**已经跑通**的托管路径，可以直接当备用。
 
+### 当前线上地址
+
+| 用途 | 地址 |
+|---|---|
+| **EdgeOne Pages（主）** | https://nfc-player.edgeone.dev/ |
+| 播放器完整地址 | https://nfc-player.edgeone.dev/?id=love |
+| GitHub Pages（备用） | https://burningleaves.github.io/nfc-player/ |
+
+**EdgeOne 加速区域选的是「全球可用区（不含中国大陆）」** —— 无需 ICP 备案，
+国内可直接访问（实测 695~866ms）。
+
+---
+
+## 音频搬国内（腾讯云 COS）
+
+落地页已经在 EdgeOne 上了，音频目前仍走 GitHub raw（国内 1~5 秒波动）。
+要进一步提速，把音频放到腾讯云 COS。
+
+### 为什么用 COS
+
+- COS 默认域名**免备案**，国内直连 100~200ms
+- 4MB 音频存储费约 0.01 元/月，流量 10GB/月免费额度绰绰有余
+- 音频在 `<audio>` 里播放不受「默认域名强制下载」限制影响
+
+> 2024 年 1 月后新建的桶，用**默认域名**访问 HTML 会被加
+> `Content-Disposition: attachment` 强制下载，**所以落地页不能放 COS**。
+> 这也是为什么落地页用 EdgeOne、音频用 COS。
+
+### 操作步骤
+
+**1. 开通 COS 并建桶**
+
+```
+console.cloud.tencent.com/cos
+  -> 新建存储桶
+  -> 名称: nfc-player   (会自动加 APPID 后缀)
+  -> 所属地域: 选离你近的 (上海/广州/北京)
+  -> 访问权限: 公有读私有写   <- 重要, 要让别人能下载音频
+  -> 其他默认
+```
+
+**2. 拿密钥**
+
+```
+console.cloud.tencent.com/cam/capi
+  -> 新建密钥
+  -> SecretId / SecretKey
+```
+
+**3. 上传**
+
+```powershell
+cd D:\OpenWrt
+fc-player
+
+python tools\cos_upload.py --bucket nfc-player-你的APPID --region ap-shanghai
+```
+
+密钥走环境变量更安全 (不进命令行历史):
+
+```powershell
+$env:TENCENT_SECRET_ID = "AKIDxxxx"
+$env:TENCENT_SECRET_KEY = "xxxx"
+python tools\cos_upload.py --bucket nfc-player-你的APPID --region ap-shanghai
+```
+
+脚本会输出音频直链, 形如:
+
+```
+https://nfc-player-1250000000.cos.ap-shanghai.myqcloud.com/audio/love-cliff.m4a
+```
+
+**4. 写进配置并推送**
+
+```powershell
+python tools\make_config.py --site "https://nfc-player.edgeone.dev" `
+  --song "爱情悬崖=https://nfc-player-你的APPID.cos.ap-shanghai.myqcloud.com/audio/love-cliff.m4a" `
+  --short love
+
+python toolspi_push.py
+```
+
+推送后 EdgeOne 自动重新部署，**标签不用重写**。
+
+
 > **推送失败时**：如果 `git push` 报 `Failed to connect to github.com:443`，
 > 说明你的网络阻断了 github.com 的 git 端点（但 api.github.com 通常还通）。
 > 此时用 GitHub REST API 提交，见本文末尾「推送失败时的替代路径」。
