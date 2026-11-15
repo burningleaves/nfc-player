@@ -1,10 +1,10 @@
 {
-  "site": "https://YOUR-DOMAIN",
+  "site": "https://YOUR-SITE",
   "songs": [
     {
-      "id": "mysong",
-      "title": "我的歌",
-      "url": "https://raw.githubusercontent.com/YOUR-USER/nfc-player/main/audio/song.mp3|https://cdn.jsdelivr.net/gh/YOUR-USER/nfc-player@main/audio/song.mp3|https://gcore.jsdelivr.net/gh/YOUR-USER/nfc-player@main/audio/song.mp3"
+      "id": "love",
+      "title": "爱情悬崖",
+      "url": "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a"
     }
   ]
 }

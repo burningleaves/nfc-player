@@ -199,9 +199,26 @@
     au.load();
   }
 
+  var playing = false;
+
+  // 真正的"开始播放"信号 —— play() 被拒时不会触发
+  au.addEventListener("playing", function () {
+    playing = true;
+    disc.classList.add("spin");
+    title.textContent = "正在播放";
+  });
+
+  au.addEventListener("pause", function () {
+    if (au.ended) return;
+    playing = false;
+    disc.classList.remove("spin");
+    if (!au.paused) return;
+  });
+
   au.addEventListener("loadedmetadata", function () {
     dur.textContent = fmt(au.duration);
     meta.textContent = candLabel();
+    if (!playing) { title.textContent = trackName || "准备就绪"; }
   });
 
   au.addEventListener("timeupdate", function () {
@@ -213,6 +230,7 @@
 
   au.addEventListener("ended", function () {
     disc.classList.remove("spin");
+    playing = false;
     fill.style.width = "100%";
     title.textContent = "播放完毕";
     replay.classList.remove("hidden");
@@ -230,13 +248,13 @@
 
   // ---- 播放控制 --------------------------------------------------------
   function start() {
-    disc.classList.add("spin");
-    title.textContent = "正在播放";
+    // 标题由 "playing" 事件来设, 这里不抢
     var p = au.play();
     if (p && p.catch) {
       p.catch(function () {
         // 自动播放被拦截 —— 退到「需要点一下」路径
         disc.classList.remove("spin");
+        playing = false;
         title.textContent = "点一下开始播放";
         btn.classList.remove("hidden");
         btn.textContent = "▶ 播放";

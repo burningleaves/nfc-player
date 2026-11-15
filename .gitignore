@@ -9,6 +9,9 @@ tools/*.ndef
 # 测试/临时文件
 site/test-tone.wav
 site/_mobile_test*.html
+site/*.wav
+site/*.mp3
+site/*.m4a
 *.tmp
 
 # 本地配置（含你的真实直链，不应进仓库）
