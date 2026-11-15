@@ -340,25 +340,28 @@
 
   btn.addEventListener("click", function () {
     btn.classList.add("hidden");
-    // 移动端浏览器上, 音频还没缓冲完就 play() 可能直接 reject。
-    // 先等 canplay 再播, 更稳。
-    function doPlay() {
-      var p = au.play();
-      if (p && p.catch) {
-        p.catch(function (err) {
-          var name = (err && err.name) ? err.name : "UnknownError";
-          showPlayBtn("播放被拒绝（" + name + "），请再点一次。");
-        });
-      }
-    }
-    if (au.readyState >= 2) {
-      doPlay();
-    } else {
-      au.addEventListener("canplay", doPlay, { once: true });
+    // 关键: play() 必须在 click 处理器里【同步】调用, 才能保留用户手势。
+    // 之前把 play() 放进 canplay 回调(异步), 手势上下文丢失 -> Chrome 拒绝播放。
+    // 所以这里: 先确保已 load, 然后立刻 play();
+    // 如果 readyState 还没到 2, 也照样先 play(), Chrome 会自己缓冲。
+    if (au.readyState === 0) {
       au.load();
-      setTimeout(function () {
-        if (au.paused) doPlay();
-      }, 1200);
+    }
+    var p;
+    try {
+      p = au.play();
+    } catch (e) {
+      p = Promise.reject(e);
+    }
+    if (p && p.catch) {
+      p.catch(function (err) {
+        var name = (err && err.name) ? err.name : "UnknownError";
+        if (name === "NotAllowedError") {
+          showPlayBtn("系统未允许播放。<br>请检查手机是否静音、或浏览器是否限制了此页面的音频。");
+        } else {
+          showPlayBtn("播放失败（" + name + "），请再点一次。");
+        }
+      });
     }
   });
 
@@ -375,24 +378,33 @@
   // 用 Web Audio 先静音「解锁」音频上下文是常见的绕过手法，
   // 但 Chrome 已对无手势场景收紧了它，所以这里只做尝试、不做依赖。
   var unlocked = false;
+  var actx = null;
+
   function unlock() {
     if (unlocked) return;
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
-      var ctx = new AC();
-      var osc = ctx.createOscillator();
-      var g = ctx.createGain();
+      if (!actx) actx = new AC();
+      var osc = actx.createOscillator();
+      var g = actx.createGain();
       g.gain.value = 0.0001;
-      osc.connect(g); g.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.01);
-      if (ctx.state === "suspended") ctx.resume();
+      osc.connect(g); g.connect(actx.destination);
+      osc.start(); osc.stop(actx.currentTime + 0.01);
+      if (actx.state === "suspended") actx.resume();
       unlocked = true;
     } catch (e) { /* 忽略 */ }
   }
 
-  // 真实用户手势（触摸/点击）时解锁音频上下文 —— 之后即使再碰标签也能自动播
-  ["touchstart", "mousedown", "keydown"].forEach(function (ev) {
+  // 页面加载时就创建 AudioContext (Chrome 允许创建, 只是不能出声)
+  // 这是给 Chrome 的信号: 这个页面会用音频。
+  try {
+    var AC0 = window.AudioContext || window.webkitAudioContext;
+    if (AC0) actx = new AC0();
+  } catch (e) { /* 忽略 */ }
+
+  // 真实用户手势(触摸/点击)时解锁音频上下文
+  ["touchstart", "mousedown", "keydown", "pointerdown"].forEach(function (ev) {
     document.addEventListener(ev, unlock, { passive: true });
   });
 
