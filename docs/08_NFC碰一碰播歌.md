@@ -189,12 +189,30 @@ https://burningleaves.github.io/nfc-player/
 
 | 用途 | 地址 |
 |---|---|
-| **EdgeOne Pages（主）** | https://nfc-player.edgeone.dev/ |
-| 播放器完整地址 | https://nfc-player.edgeone.dev/?id=love |
+| **EdgeOne Pages（主）** | https://nfc-player-dpre48ptcgkc.edgeone.cool/ |
+| **播放器完整地址** | **https://nfc-player-dpre48ptcgkc.edgeone.cool/?id=love** |
 | GitHub Pages（备用） | https://burningleaves.github.io/nfc-player/ |
 
-**EdgeOne 加速区域选的是「全球可用区（不含中国大陆）」** —— 无需 ICP 备案，
-国内可直接访问（实测 695~866ms）。
+**EdgeOne 加速区域：全球可用区（包含中国大陆）** —— 无需 ICP 备案。
+
+### EdgeOne 中国大陆可用区的实测坑
+
+选「全球可用区（包含中国大陆）」后，EdgeOne 会**按访问来源 IP 判断**：
+
+- ✅ 国内网络（校园网 / 宽带 / 5G 移动网络）**直接可访问**
+- ❌ 境外 IP 一律返回 `401 UNAUTHORIZED`（响应头 `X-EOP-MSG: eo_time missing`）
+- ⚠️ 控制台的「预览」链接带 `?eo_token=...`，**只有 3 小时有效期**，不能写进 NFC 标签
+
+所以标签里必须写**不带 token 的项目域名**：
+
+```
+https://nfc-player-dpre48ptcgkc.edgeone.cool/?id=love
+```
+
+### 访问时必须带 ?id=xxx
+
+直接打开项目根域名会报「没有指定音频」—— 落地页需要 `?id=` 才知道播哪首。
+每个 id 对应 config.json 里的一条 song。
 
 ---
 
