@@ -1,10 +1,10 @@
 {
-  "site": "https://nfc-player-dpehumlvjpem.edgeone.cool",
+  "site": "https://burningleaves.github.io/nfc-player",
   "songs": [
     {
       "id": "love",
       "title": "爱情悬崖",
-      "url": "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a"
+      "url": "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.aac|https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac"
     }
   ]
 }
