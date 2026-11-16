@@ -9,6 +9,11 @@ tools/*.ndef
 # 测试/临时文件
 site/test-tone.wav
 site/_mobile_test*.html
+site/_probe.html
+site/_no_co.html
+site/_with_co.html
+site/t.m4a
+site/t.aac
 site/*.wav
 site/*.mp3
 site/*.m4a

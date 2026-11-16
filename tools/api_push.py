@@ -175,7 +175,7 @@ def main() -> int:
             continue
         remote_bytes = base64.b64decode(blob['content'])
         # 行尾归一化后比较: Git 仓库里是 LF, 本地 Windows 可能是 CRLF
-        if remote_bytes.replace(b'\r\n', b'\n') == data.replace(b'\r\n', b'\n'):
+        if remote_bytes.replace(b'\r\n', b'\n').strip() == data.replace(b'\r\n', b'\n').strip():
             continue
         changed[path] = data
 
