@@ -72,6 +72,7 @@
   <button id="replay" class="ghost hidden">↻ 重播</button>
 
   <div class="err" id="err"></div>
+  <div id="diag" style="font-size:10px;opacity:.45;margin-top:8px;font-family:monospace"></div>
   <div class="hint" id="hint"></div>
 </div>
 
@@ -98,7 +99,7 @@
 
   // ---- 版本号 ----------------------------------------------------------
   // 改代码后 bump 这个号, 方便确认手机跑的是哪一版 (也强制绕过缓存)
-  var BUILD = "20261115-2";
+  var BUILD = "20261115-3";
   (function () {
     try {
       var v = document.getElementById("ver");
@@ -250,6 +251,19 @@
     trackName = name || "";
     au.preload = "auto";
     if (trackName) title.textContent = trackName;
+    // 系统媒体会话: 让手机状态栏/锁屏出现媒体控件。
+    // 某些安卓浏览器(百度/自带)只有注册了 mediaSession 才更容易正常出声。
+    try {
+      if (navigator.mediaSession) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: trackName || "NFC 碰一碰",
+          artist: "NFC 碰一碰 · 播放",
+          album: "一碰就播"
+        });
+        navigator.mediaSession.setActionHandler("play", function () { au.play(); });
+        navigator.mediaSession.setActionHandler("pause", function () { au.pause(); });
+      }
+    } catch (e) { /* ignore */ }
     tryNext();
   }
 
@@ -273,6 +287,25 @@
   var playing = false;
 
   // 真正的"开始播放"信号 —— play() 被拒时不会触发
+  // ---- 诊断信息 ------------------------------------------------------
+  // 在页面上实时显示播放链路状态, 便于在真机上定位问题
+  function diagLine() {
+    var bits = [];
+    bits.push("st=" + au.readyState);
+    bits.push(au.paused ? "paused" : "playing");
+    bits.push("ctx=" + (actx ? actx.state : "none"));
+    bits.push(au.crossOrigin ? "cors" : "nocors");
+    bits.push(au._srcSetByUser ? "wa" : "direct");
+    bits.push("v=" + au.volume);
+    return bits.join(" ");
+  }
+
+  function showDiag() {
+    var d = document.getElementById("diag");
+    if (d) d.textContent = diagLine();
+  }
+  setInterval(showDiag, 500);
+
   au.addEventListener("playing", function () {
     playing = true;
     disc.classList.add("spin");
@@ -394,10 +427,7 @@
     // Web Audio 接入放到后面: resume() 是异步的, state 变 running 需要时间,
     // 先让 <audio> 直接出声(保证有声), 再在 context running 后接管。
     // 若接管失败, <audio> 仍在直接输出, 不受影响。
-    setTimeout(function () {
-      if (actx && actx.state !== "running") actx.resume();
-      setTimeout(routeThroughWebAudio, 60);
-    }, 0);
+    routeWhenReady();
   });
 
   replay.addEventListener("click", function () {
@@ -473,6 +503,23 @@
       // 失败(比如重复连接)就退回直接输出, 不影响基本功能
       return false;
     }
+  }
+
+  // resume() 是异步的: 调用后 state 要过一会儿才变成 running。
+  // 监听 statechange, 一旦 running 就立刻把 <audio> 接进 Web Audio,
+  // 这样安卓浏览器能拿到音频焦点 (解决"进度条走但没声音")。
+  function routeWhenReady() {
+    if (!actx) return;
+    if (actx.state === "running") { routeThroughWebAudio(); return; }
+    try { actx.resume(); } catch (e) { /* ignore */ }
+    if (actx.addEventListener) {
+      actx.addEventListener("statechange", function () {
+        if (actx.state === "running") routeThroughWebAudio();
+      }, { once: true });
+    }
+    // 兜底: 某些实现不触发 statechange
+    setTimeout(function () { if (actx.state === "running") routeThroughWebAudio(); }, 250);
+    setTimeout(function () { if (actx.state === "running") routeThroughWebAudio(); }, 800);
   }
 
   // 首次用户交互时: 解锁 + 接入 Web Audio
