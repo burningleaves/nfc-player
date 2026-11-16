@@ -75,7 +75,10 @@
   <div class="hint" id="hint"></div>
 </div>
 
-<audio id="au" playsinline preload="auto"></audio>
+<!-- crossorigin="anonymous" 让 createMediaElementSource 能正常工作
+     (Web Audio 要求 CORS 干净的媒体). 实测 GitHub raw / jsDelivr 都返回
+     Access-Control-Allow-Origin: *, 所以加这个是安全的. -->
+<audio id="au" playsinline preload="auto" crossorigin="anonymous"></audio>
 
 <script>
 (function () {
@@ -137,7 +140,7 @@
     {
       id: "love",
       title: "爱情悬崖",
-      url: "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.aac|https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac"
+      url: "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.aac|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac"
     },
   ];
   // <<< FALLBACK_SONGS
@@ -281,10 +284,8 @@
     // 重要: play() 被浏览器拦截(自动播放策略)时, 媒体元素也会触发 error 事件。
     // 如果不区分, 就会误判成"这个源坏了"而切到下一个源, 把所有源切一遍后
     // 显示"音频加载失败" —— 但其实只是需要用户点一下。
-    // 判断依据: 错误来自网络/解码 (MEDIA_ERR_SRC_NOT_SUPPORTED / MEDIA_ERR_NETWORK)
-    // 而不是 NotAllowedError。
     if (au.error && au.error.code === au.error.MEDIA_ERR_ABORTED) {
-      return;   // 用户主动中止, 忽略
+      return;   // 用户主动中止/重新加载, 忽略
     }
     if (au.error && (au.error.code === au.error.MEDIA_ERR_DECODE ||
                      au.error.code === au.error.MEDIA_ERR_SRC_NOT_SUPPORTED ||
@@ -340,10 +341,10 @@
 
   btn.addEventListener("click", function () {
     btn.classList.add("hidden");
+    // 在用户手势里立刻解锁 AudioContext
+    unlock();
     // 关键: play() 必须在 click 处理器里【同步】调用, 才能保留用户手势。
     // 之前把 play() 放进 canplay 回调(异步), 手势上下文丢失 -> Chrome 拒绝播放。
-    // 所以这里: 先确保已 load, 然后立刻 play();
-    // 如果 readyState 还没到 2, 也照样先 play(), Chrome 会自己缓冲。
     if (au.readyState === 0) {
       au.load();
     }
@@ -363,6 +364,13 @@
         }
       });
     }
+    // Web Audio 接入放到后面: resume() 是异步的, state 变 running 需要时间,
+    // 先让 <audio> 直接出声(保证有声), 再在 context running 后接管。
+    // 若接管失败, <audio> 仍在直接输出, 不受影响。
+    setTimeout(function () {
+      if (actx && actx.state !== "running") actx.resume();
+      setTimeout(routeThroughWebAudio, 60);
+    }, 0);
   });
 
   replay.addEventListener("click", function () {
@@ -406,6 +414,46 @@
   // 真实用户手势(触摸/点击)时解锁音频上下文
   ["touchstart", "mousedown", "keydown", "pointerdown"].forEach(function (ev) {
     document.addEventListener(ev, unlock, { passive: true });
+  });
+
+  // ---- 把 <audio> 接入 Web Audio 链路 -------------------------------------
+  // 背景: 某些安卓浏览器(自带浏览器/百度浏览器/WebView)会出现
+  // "进度条在走但没有声音" —— 因为 <audio> 元素直接输出时没有拿到音频焦点,
+  // 被系统当作"后台媒体"静音处理。
+  // 解法: 用 createMediaElementSource 把 <audio> 接到 Web Audio 图里,
+  // 让它走和 Web Audio 一样的输出路径, 这样焦点/音量都正常。
+  // 注意: 一旦接上, <audio>.volume 就不再生效, 要用 GainNode 控制音量。
+  var gainNode = null;
+  function routeThroughWebAudio() {
+    if (!actx) return false;
+    // 关键: AudioContext 处于 suspended 时接入 MediaElementSource,
+    // 音频会被挂起 -> 表现就是"进度条在走但没声音"。
+    // 所以只在 context 已经是 running 时才接入。
+    if (actx.state !== "running") {
+      try { actx.resume(); } catch (e) { /* ignore */ }
+      if (actx.state !== "running") return false;
+    }
+    try {
+      if (au._srcSetByUser) return true;   // 已经接过了
+      var src = au.createMediaElementSource(au);
+      gainNode = actx.createGain();
+      gainNode.gain.value = 1.0;
+      src.connect(gainNode);
+      gainNode.connect(actx.destination);
+      au._srcSetByUser = true;
+      return true;
+    } catch (e) {
+      // 失败(比如重复连接)就退回直接输出, 不影响基本功能
+      return false;
+    }
+  }
+
+  // 首次用户交互时: 解锁 + 接入 Web Audio
+  ["touchstart", "mousedown", "keydown", "pointerdown"].forEach(function (ev) {
+    document.addEventListener(ev, function () {
+      unlock();
+      routeThroughWebAudio();
+    }, { passive: true });
   });
 
   function begin() {
