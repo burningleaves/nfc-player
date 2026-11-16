@@ -2,552 +2,437 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NFC 碰一碰 · 播放 <span id="ver" style="font-size:11px;opacity:.5"></span></title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>爱情悬崖</title>
 <style>
   :root{
-    --bg:#0f1115; --fg:#e8eaf0; --dim:#9aa3b2; --accent:#4f8cff; --card:#181b22;
+    --bg:#0b0d10; --fg:#eceff4; --dim:#8b95a5; --accent:#4f8cff;
+    --card:#14171d; --line:#232830;
   }
   @media (prefers-color-scheme: light){
-    :root{ --bg:#f6f7f9; --fg:#1b1e25; --dim:#5d6573; --accent:#2f6bdc; --card:#fff; }
+    :root{ --bg:#f4f5f7; --fg:#16191f; --dim:#5f6875; --card:#fff; --line:#e2e5ea; }
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%; margin:0;}
   body{
     background:var(--bg); color:var(--fg);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
-    display:flex; align-items:center; justify-content:center; padding:24px;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    overscroll-behavior:none;
   }
-  .wrap{width:100%; max-width:420px; text-align:center;}
-  .disc{
-    width:150px;height:150px;margin:0 auto 26px;border-radius:50%;
-    background:radial-gradient(circle at 50% 50%, #2a2f3a 0 22%, #171a21 23% 100%);
-    border:1px solid #2b313d; position:relative;
-    display:flex;align-items:center;justify-content:center;
+  .wrap{width:100%; max-width:400px;}
+  .cover{
+    width:min(74vw, 300px); aspect-ratio:1; margin:0 auto 26px;
+    border-radius:50%; overflow:hidden; position:relative;
+    box-shadow:0 18px 46px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06);
   }
-  .disc::after{
-    content:"";position:absolute;inset:14px;border-radius:50%;
-    border:1px dashed #343b49;
+  .cover img{width:100%; height:100%; object-fit:cover; display:block;}
+  .cover.spin img{animation:spin 9s linear infinite;}
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  .cover::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:radial-gradient(circle at 32% 26%, rgba(255,255,255,.16), transparent 46%);
+    pointer-events:none;
   }
-  .disc.spin::before{
-    content:"";position:absolute;inset:0;border-radius:50%;
-    background:conic-gradient(from 0deg, transparent 0 70%, rgba(79,140,255,.28) 100%);
-    animation:spin 6s linear infinite;
-  }
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .disc.spin::after{animation:spin 6s linear infinite reverse}
-  h1{font-size:19px;margin:0 0 6px;font-weight:600;}
-  .meta{color:var(--dim);font-size:13px;margin-bottom:22px; min-height:18px;}
+  .title{font-size:20px; font-weight:650; text-align:center; margin:0 0 4px;}
+  .artist{font-size:13px; color:var(--dim); text-align:center; margin:0 0 20px;}
   .bar{
-    height:5px;border-radius:3px;background:#2a2f3a;overflow:hidden;margin-bottom:8px;
+    height:22px; display:flex; align-items:center; cursor:pointer;
+    touch-action:none; margin-bottom:4px;
   }
-  .bar > i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s linear;}
-  .time{display:flex;justify-content:space-between;color:var(--dim);font-size:12px;margin-bottom:24px;}
-  button{
-    font:inherit; font-size:16px; font-weight:600;
-    padding:15px 34px; border-radius:999px; border:0; cursor:pointer;
-    background:var(--accent); color:#fff; width:100%;
-    box-shadow:0 6px 20px rgba(79,140,255,.28);
+  .track{height:5px; width:100%; background:var(--line); border-radius:3px; position:relative;}
+  .fill{
+    height:100%; width:0; background:var(--accent); border-radius:3px;
+    position:relative;
   }
-  button:active{transform:translateY(1px)}
-  button.ghost{
-    background:transparent;color:var(--dim);border:1px solid #2b313d;box-shadow:none;
-    font-size:13px;padding:10px 20px;margin-top:12px;width:auto;font-weight:400;
+  .fill::after{
+    content:""; position:absolute; right:-6px; top:50%;
+    width:12px; height:12px; margin-top:-6px; border-radius:50%;
+    background:var(--accent); box-shadow:0 1px 5px rgba(0,0,0,.5);
+    opacity:0; transition:opacity .15s;
   }
-  .err{color:#ff6b6b;font-size:13px;margin-top:16px;display:none;line-height:1.6;}
-  .err.show{display:block}
-  .hint{color:var(--dim);font-size:12px;margin-top:22px;line-height:1.7;}
+  .bar.active .fill::after{opacity:1;}
+  .times{display:flex; justify-content:space-between; color:var(--dim); font-size:11px; font-variant-numeric:tabular-nums;}
+  .ctrls{display:flex; align-items:center; justify-content:center; gap:26px; margin:22px 0 6px;}
+  .btn{
+    width:44px; height:44px; border-radius:50%; border:0; cursor:pointer;
+    background:transparent; color:var(--fg); display:flex; align-items:center;
+    justify-content:center; transition:transform .12s, background .15s;
+  }
+  .btn:active{transform:scale(.9);}
+  .btn svg{width:26px; height:26px; fill:currentColor;}
+  .btn.main{
+    width:64px; height:64px; background:var(--accent); color:#fff;
+    box-shadow:0 8px 24px rgba(79,140,255,.34);
+  }
+  .btn.main svg{width:30px; height:30px;}
+  .btn:disabled{opacity:.35;}
+  .hint{color:var(--dim); font-size:12px; text-align:center; margin-top:16px; line-height:1.6;}
+  .err{color:#ff6b6b; font-size:13px; text-align:center; margin-top:12px; display:none; line-height:1.6;}
+  .err.show{display:block;}
   .hidden{display:none !important;}
+  .diag{font-size:10px; opacity:.4; text-align:center; margin-top:10px; font-family:monospace;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="disc" id="disc"></div>
-  <h1 id="title">正在准备播放…</h1>
-  <div class="meta" id="meta">&nbsp;</div>
-  <div class="bar"><i id="fill"></i></div>
-  <div class="time"><span id="cur">0:00</span><span id="dur">--:--</span></div>
+  <div class="cover" id="cover"><img id="img" src="cover.jpg" alt=""></div>
+  <h1 class="title" id="title">爱情悬崖</h1>
+  <div class="artist" id="artist">周杰伦 · 叶惠美</div>
 
-  <button id="play" class="hidden">▶ 播放</button>
-  <button id="replay" class="ghost hidden">↻ 重播</button>
+  <div class="bar" id="bar">
+    <div class="track"><div class="fill" id="fill"></div></div>
+  </div>
+  <div class="times"><span id="cur">0:00</span><span id="dur">--:--</span></div>
+
+  <div class="ctrls">
+    <button class="btn" id="prev" aria-label="上一首">
+      <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 6v12z"/></svg>
+    </button>
+    <button class="btn main" id="play" aria-label="播放">
+      <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="btn" id="next" aria-label="下一首">
+      <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+    </button>
+  </div>
 
   <div class="err" id="err"></div>
-  <div id="diag" style="font-size:10px;opacity:.45;margin-top:8px;font-family:monospace"></div>
   <div class="hint" id="hint"></div>
+  <div class="diag" id="diag"></div>
 </div>
 
-<!-- crossorigin="anonymous" 让 createMediaElementSource 能正常工作
-     (Web Audio 要求 CORS 干净的媒体). 实测 GitHub raw / jsDelivr 都返回
-     Access-Control-Allow-Origin: *, 所以加这个是安全的. -->
-<audio id="au" playsinline preload="auto" crossorigin="anonymous"></audio>
+<audio id="au" playsinline preload="auto"></audio>
 
-<script>
-(function () {
-  "use strict";
+<script>(function () {
+"use strict";
 
-  var au     = document.getElementById("au");
-  var btn    = document.getElementById("play");
-  var replay = document.getElementById("replay");
-  var disc   = document.getElementById("disc");
-  var fill   = document.getElementById("fill");
-  var cur    = document.getElementById("cur");
-  var dur    = document.getElementById("dur");
-  var meta   = document.getElementById("meta");
-  var title  = document.getElementById("title");
-  var errBox = document.getElementById("err");
-  var hint   = document.getElementById("hint");
+var au = document.getElementById("au");
+var cover = document.getElementById("cover");
+var img = document.getElementById("img");
+var titleEl = document.getElementById("title");
+var artistEl = document.getElementById("artist");
+var bar = document.getElementById("bar");
+var fill = document.getElementById("fill");
+var curEl = document.getElementById("cur");
+var durEl = document.getElementById("dur");
+var playBtn = document.getElementById("play");
+var playIcon = document.getElementById("playIcon");
+var prevBtn = document.getElementById("prev");
+var nextBtn = document.getElementById("next");
+var errBox = document.getElementById("err");
+var hint = document.getElementById("hint");
+var diagEl = document.getElementById("diag");
 
-  // ---- 版本号 ----------------------------------------------------------
-  // 改代码后 bump 这个号, 方便确认手机跑的是哪一版 (也强制绕过缓存)
-  var BUILD = "20261115-3";
-  (function () {
-    try {
-      var v = document.getElementById("ver");
-      if (v) v.textContent = BUILD;
-    } catch (e) { /* ignore */ }
-  })();
+var qs = new URLSearchParams(location.search);
+var shortId = qs.get("id") || null;
+var directSrc = qs.get("src") || "";
 
-  // 缓存自检: 拉一份带随机参数的 config.json, 看服务器上的版本是否比本页新。
-  // 若新, 提示用户强制刷新 (手机浏览器很容易缓存旧 HTML)。
-  (function () {
-    try {
-      fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
-        .then(function (r) { return r.ok ? r.text() : null; })
-        .then(function (t) {
-          if (!t) return;
-          if (t.trim() && t.trim() !== BUILD) {
-            hint.innerHTML = "检测到新版本 (" + t.trim() + ")，当前页面是旧缓存。<br>" +
-              "请下拉刷新页面, 或在地址栏加 &r=" + Date.now() + " 重新打开。";
-            hint.style.color = "#ffb454";
-          }
-        })
-        .catch(function () { /* ignore */ });
-    } catch (e) { /* ignore */ }
-  })();
-  // ---- 取参数 ----------------------------------------------------------
-  var qs = new URLSearchParams(location.search);
-  // src 可以放在 ?src= ，也允许标签直接指向音频直链（此时用落地页包一层）
-  var raw = qs.get("src") || qs.get("u") || "";
-  var titleText = qs.get("t") || "";
-  var autoFlag = qs.get("auto");
-  var shortId = null;
+var candidates = [], candIdx = 0, trackName = "", trackArtist = "";
+var playing = false, actx = null, gainNode = null;
+var scrubbing = false, scrubTime = 0;
+var playlist = [];
 
-  // 若本页被直接当音频打开（例如标签里写的是 .mp3 直链），
-  // 就把当前地址当音频源，重新带 src 参数 reload 一次。
-  if (!raw && /\.(mp3|m4a|aac|ogg|opus|wav|flac)(\?|$)/i.test(location.pathname + location.search)) {
-    var next = location.origin + location.pathname + "?src=" + encodeURIComponent(location.href);
-    location.replace(next);
-    return;
-  }
+var ICON_PLAY = "M8 5v14l11-7z";
+var ICON_PAUSE = "M6 5h4v14H6zm8 0h4v14h-4z";
 
-  // 短 ID: ?id=<id>  —— 从 config.json 查真实直链
-  // 用查询参数而不是 /p/<id> 路径: GitHub Pages 不会把 /p/demo 映射到
-  // index.html, 而 ?id= 一定命中 index.html, 零配置。
-  var shortId = qs.get("id") || null;
+function fmt(s) {
+  if (!isFinite(s) || s < 0) return "--:--";
+  var m = Math.floor(s / 60), x = Math.floor(s % 60);
+  return m + ":" + (x < 10 ? "0" : "") + x;
+}
 
-  function showErr(msg) {
-    errBox.textContent = msg;
-    errBox.classList.add("show");
-  }
-  function fmt(s) {
-    if (!isFinite(s) || s < 0) return "--:--";
-    var mm = Math.floor(s / 60), x = Math.floor(s % 60);
-    return mm + ":" + (x < 10 ? "0" : "") + x;
-  }
+function showErr(m) { errBox.textContent = m; errBox.classList.add("show"); }
+function clearErr() { errBox.classList.remove("show"); errBox.textContent = ""; }
 
-  function fail(msg) {
-    title.textContent = "无法播放";
-    meta.innerHTML = "&nbsp;";
-    btn.classList.add("hidden");
-    showErr(msg);
-    hint.innerHTML = "如果是刚配好还没上传 config.json, 请等 GitHub Pages 部署完成后再试。";
-  }
+function setIcon(on) {
+  playIcon.setAttribute("d", on ? ICON_PAUSE : ICON_PLAY);
+  playBtn.setAttribute("aria-label", on ? "暂停" : "播放");
+}
 
-  // >>> FALLBACK_SONGS (auto-generated by inject_fallback.py)
-  var FALLBACK_SONGS = [
-    {
-      id: "love",
-      title: "爱情悬崖",
-      url: "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.aac|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac"
-    },
-  ];
-  // <<< FALLBACK_SONGS
+function setPlaying(on) {
+  playing = on;
+  setIcon(on);
+  cover.classList.toggle("spin", on);
+}
 
-  // ---- 解析音频源 ------------------------------------------------------
-  // 优先级: ?src=  >  /p/<id> 查 config.json
-  function resolve(cb) {
-    if (raw) { cb(raw, titleText); return; }
-    if (!shortId) {
-      fail("没有指定音频。用 ?src=直链 打开本页, 或访问 ?id=&lt;短ID&gt;。");
-      return;
-    }
-    title.textContent = "正在读取配置…";
-    // 多路径回退: 不同托管平台的输出目录配置不一样, 逐个试
-    var cfgPaths = ["config.json", "site/config.json", "./config.json"];
-    var cfgIdx = 0;
-    var lastErr = null;
+function showDiag() {
+  if (!diagEl) return;
+  var b = [];
+  b.push("st=" + au.readyState);
+  b.push(au.paused ? "paused" : "playing");
+  b.push("ctx=" + (actx ? actx.state : "none"));
+  b.push(au._srcSetByUser ? "wa" : "direct");
+  b.push("v=" + au.volume);
+  diagEl.textContent = b.join(" ");
+}
+setInterval(showDiag, 500);
 
-    function tryCfg() {
-      if (cfgIdx >= cfgPaths.length) {
-        // 兜底: 用页面内嵌的歌单 (写在 HTML 里的 FALLBACK_SONGS)
-        if (typeof FALLBACK_SONGS !== "undefined" && FALLBACK_SONGS.length) {
-          var fb = null;
-          for (var k = 0; k < FALLBACK_SONGS.length; k++) {
-            if (FALLBACK_SONGS[k].id === shortId) { fb = FALLBACK_SONGS[k]; break; }
-          }
-          if (fb) {
-            title.textContent = "使用内置歌单";
-            hint.innerHTML = "config.json 没读到, 已使用页面内置歌单。";
-            cb(fb.url, fb.title || "");
-            return;
-          }
-        }
-        var msg = "读取 config.json 失败" + (lastErr ? ": " + lastErr : "");
-        msg += "\n\n已尝试: " + cfgPaths.join(", ");
-        msg += "\n\n如果托管平台输出目录是 site/, 那 config.json 应该在根目录; " +
-               "反之亦然。也可能是该文件未被部署。";
-        fail(msg);
-        return;
-      }
-      var p = cfgPaths[cfgIdx++];
-      fetch(p, { cache: "no-cache" })
-        .then(function (r) {
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          return r.json();
-        })
-        .then(function (cfg) { onConfig(cfg); })
-        .catch(function (e) { lastErr = e.message; tryCfg(); });
-    }
-
-    function onConfig(cfg) {
-      var list = cfg.songs || [];
-      var hit = null;
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].id === shortId) { hit = list[i]; break; }
-      }
-      if (!hit) {
-        fail("config.json 里没有 id=\"" + shortId + "\" 的条目。\n现有 id: " +
-             list.map(function (s) { return s.id; }).join(", "));
-        return;
-      }
-      cb(hit.url, hit.title || "");
-    }
-
-    tryCfg();
-  }
-
-  // ---- 设置音频源 ------------------------------------------------------
-  // 支持多 CDN 回退: 第一个源加载失败就自动换下一个。
-  // 实测 raw.githubusercontent.com 与 jsDelivr 在不同网络下快慢不同。
-  var candidates = [];
-  var candIdx = 0;
-  var trackName = "";
-
-  function loadSource(srcUrl, name) {
-    // srcUrl 可以是单个 URL, 也可以是用 | 分隔的多个候选源
-    candidates = String(srcUrl).split("|").map(function (u) { return u.trim(); }).filter(Boolean);
-    if (!candidates.length) { fail("没有可用的音频地址"); return; }
-    candIdx = 0;
-    trackName = name || "";
-    au.preload = "auto";
-    if (trackName) title.textContent = trackName;
-    // 系统媒体会话: 让手机状态栏/锁屏出现媒体控件。
-    // 某些安卓浏览器(百度/自带)只有注册了 mediaSession 才更容易正常出声。
-    try {
-      if (navigator.mediaSession) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: trackName || "NFC 碰一碰",
-          artist: "NFC 碰一碰 · 播放",
-          album: "一碰就播"
-        });
-        navigator.mediaSession.setActionHandler("play", function () { au.play(); });
-        navigator.mediaSession.setActionHandler("pause", function () { au.pause(); });
-      }
-    } catch (e) { /* ignore */ }
-    tryNext();
-  }
-
-  function candLabel() {
-    var base = trackName || raw.replace(/\?.*$/, "").split("/").pop();
-    return base + (candidates.length > 1 ? "  " + candIdx + "/" + candidates.length : "");
-  }
-
-  function tryNext() {
-    if (candIdx >= candidates.length) {
-      disc.classList.remove("spin");
-      showErr("所有音频源都加载失败：\n" + candidates.join("\n"));
-      return;
-    }
-    raw = candidates[candIdx++];
-    au.src = raw;
-    meta.textContent = candLabel();
-    au.load();
-  }
-
-  var playing = false;
-
-  // 真正的"开始播放"信号 —— play() 被拒时不会触发
-  // ---- 诊断信息 ------------------------------------------------------
-  // 在页面上实时显示播放链路状态, 便于在真机上定位问题
-  function diagLine() {
-    var bits = [];
-    bits.push("st=" + au.readyState);
-    bits.push(au.paused ? "paused" : "playing");
-    bits.push("ctx=" + (actx ? actx.state : "none"));
-    bits.push(au.crossOrigin ? "cors" : "nocors");
-    bits.push(au._srcSetByUser ? "wa" : "direct");
-    bits.push("v=" + au.volume);
-    return bits.join(" ");
-  }
-
-  function showDiag() {
-    var d = document.getElementById("diag");
-    if (d) d.textContent = diagLine();
-  }
-  setInterval(showDiag, 500);
-
-  au.addEventListener("playing", function () {
-    playing = true;
-    disc.classList.add("spin");
-    title.textContent = "正在播放";
-  });
-
-  au.addEventListener("pause", function () {
-    if (au.ended) return;
-    playing = false;
-    disc.classList.remove("spin");
-    if (!au.paused) return;
-  });
-
-  au.addEventListener("loadedmetadata", function () {
-    dur.textContent = fmt(au.duration);
-    meta.textContent = candLabel();
-    if (!playing) { title.textContent = trackName || "准备就绪"; }
-  });
-
-  au.addEventListener("timeupdate", function () {
-    cur.textContent = fmt(au.currentTime);
-    if (au.duration && isFinite(au.duration)) {
-      fill.style.width = (au.currentTime / au.duration * 100) + "%";
-    }
-  });
-
-  au.addEventListener("ended", function () {
-    disc.classList.remove("spin");
-    playing = false;
-    fill.style.width = "100%";
-    title.textContent = "播放完毕";
-    replay.classList.remove("hidden");
-  });
-
-  au.addEventListener("error", function () {
-    // 重要: play() 被浏览器拦截(自动播放策略)时, 媒体元素也会触发 error 事件。
-    // 如果不区分, 就会误判成"这个源坏了"而切到下一个源, 把所有源切一遍后
-    // 显示"音频加载失败" —— 但其实只是需要用户点一下。
-    if (au.error && au.error.code === au.error.MEDIA_ERR_ABORTED) {
-      return;   // 用户主动中止/重新加载, 忽略
-    }
-    if (au.error && (au.error.code === au.error.MEDIA_ERR_DECODE ||
-                     au.error.code === au.error.MEDIA_ERR_SRC_NOT_SUPPORTED ||
-                     au.error.code === au.error.MEDIA_ERR_NETWORK)) {
-      if (candIdx < candidates.length) {
-        tryNext();   // 真的坏了, 换下一个源
-        return;
-      }
-      disc.classList.remove("spin");
-      showErr("音频加载失败：直链可能已失效，或该地址不允许跨域播放。\n" + raw);
-      return;
-    }
-    // 没有 error 对象 —— 多半是 play() 被拒, 交给 start() 里的 catch 处理
-    disc.classList.remove("spin");
-  });
-
-  // ---- 播放控制 --------------------------------------------------------
-  var autoplayBlocked = false;
-
-  function showPlayBtn(reason) {
-    disc.classList.remove("spin");
-    playing = false;
-    title.textContent = "点一下开始播放";
-    btn.classList.remove("hidden");
-    btn.textContent = "▶ 播放";
-    if (reason) {
-      hint.innerHTML = reason;
-    }
-  }
-
-  function start() {
-    // 标题由 "playing" 事件来设, 这里不抢
-    var p = au.play();
-    if (p && p.catch) {
-      p.catch(function (err) {
-        // 自动播放被拦截 —— 退到「需要点一下」路径
-        autoplayBlocked = true;
-        var name = (err && err.name) ? err.name : "UnknownError";
-        if (name === "NotAllowedError") {
-          showPlayBtn("浏览器拦截了自动播放（Chrome 策略）。<br>点上面的按钮即可开始播放。");
-        } else {
-          showPlayBtn("自动播放失败（" + name + "）。<br>点上面的按钮重试。");
-        }
-      });
-    }
-    // 保险: 1.5 秒后如果还没开始播且按钮没显示, 强制显示
-    setTimeout(function () {
-      if (au.paused && btn.classList.contains("hidden") && !playing) {
-        showPlayBtn("点击下面的按钮开始播放。");
-      }
-    }, 1500);
-  }
-
-  btn.addEventListener("click", function () {
-    btn.classList.add("hidden");
-    // 在用户手势里立刻解锁 AudioContext
-    unlock();
-    // 关键: play() 必须在 click 处理器里【同步】调用, 才能保留用户手势。
-    // 之前把 play() 放进 canplay 回调(异步), 手势上下文丢失 -> Chrome 拒绝播放。
-    if (au.readyState === 0) {
-      au.load();
-    }
-    var p;
-    try {
-      p = au.play();
-    } catch (e) {
-      p = Promise.reject(e);
-    }
-    if (p && p.catch) {
-      p.catch(function (err) {
-        var name = (err && err.name) ? err.name : "UnknownError";
-        if (name === "NotAllowedError") {
-          showPlayBtn("系统未允许播放。<br>请检查手机是否静音、或浏览器是否限制了此页面的音频。");
-        } else {
-          showPlayBtn("播放失败（" + name + "），请再点一次。");
-        }
-      });
-    }
-    // Web Audio 接入放到后面: resume() 是异步的, state 变 running 需要时间,
-    // 先让 <audio> 直接出声(保证有声), 再在 context running 后接管。
-    // 若接管失败, <audio> 仍在直接输出, 不受影响。
-    routeWhenReady();
-  });
-
-  replay.addEventListener("click", function () {
-    au.currentTime = 0;
-    replay.classList.add("hidden");
-    start();
-  });
-
-  // ---- 自动播放尝试 ----------------------------------------------------
-  // Chrome 的自动播放策略：用户与页面有交互（点击/触摸）或已播放过音频，
-  // 才允许无手势播放。NFC 跳转过来的页面算 "有导航"，但不算 "有用户手势"，
-  // 所以在桌面 Chrome 上大概率被拦 —— 必须保留 btn 兜底路径。
-  // 用 Web Audio 先静音「解锁」音频上下文是常见的绕过手法，
-  // 但 Chrome 已对无手势场景收紧了它，所以这里只做尝试、不做依赖。
-  var unlocked = false;
-  var actx = null;
-
-  function unlock() {
-    if (unlocked) return;
+function unlock() {
+  if (!actx) {
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      if (!actx) actx = new AC();
-      var osc = actx.createOscillator();
-      var g = actx.createGain();
-      g.gain.value = 0.0001;
-      osc.connect(g); g.connect(actx.destination);
-      osc.start(); osc.stop(actx.currentTime + 0.01);
-      if (actx.state === "suspended") actx.resume();
-      unlocked = true;
-    } catch (e) { /* 忽略 */ }
+      if (AC) actx = new AC();
+    } catch (e) {}
   }
-
-  // 页面加载时就创建 AudioContext (Chrome 允许创建, 只是不能出声)
-  // 这是给 Chrome 的信号: 这个页面会用音频。
+  if (!actx) return;
   try {
-    var AC0 = window.AudioContext || window.webkitAudioContext;
-    if (AC0) actx = new AC0();
-  } catch (e) { /* 忽略 */ }
+    if (actx.state === "suspended") actx.resume();
+    var osc = actx.createOscillator(), g = actx.createGain();
+    g.gain.value = 0.0001;
+    osc.connect(g); g.connect(actx.destination);
+    osc.start(); osc.stop(actx.currentTime + 0.01);
+  } catch (e) {}
+}
 
-  // 真实用户手势(触摸/点击)时解锁音频上下文
-  ["touchstart", "mousedown", "keydown", "pointerdown"].forEach(function (ev) {
-    document.addEventListener(ev, unlock, { passive: true });
-  });
+function route() {
+  if (!actx || actx.state !== "running") return false;
+  if (au._srcSetByUser) return true;
+  try {
+    var src = au.createMediaElementSource(au);
+    gainNode = actx.createGain();
+    gainNode.gain.value = 1.0;
+    src.connect(gainNode);
+    gainNode.connect(actx.destination);
+    au._srcSetByUser = true;
+    return true;
+  } catch (e) { return false; }
+}
 
-  // ---- 把 <audio> 接入 Web Audio 链路 -------------------------------------
-  // 背景: 某些安卓浏览器(自带浏览器/百度浏览器/WebView)会出现
-  // "进度条在走但没有声音" —— 因为 <audio> 元素直接输出时没有拿到音频焦点,
-  // 被系统当作"后台媒体"静音处理。
-  // 解法: 用 createMediaElementSource 把 <audio> 接到 Web Audio 图里,
-  // 让它走和 Web Audio 一样的输出路径, 这样焦点/音量都正常。
-  // 注意: 一旦接上, <audio>.volume 就不再生效, 要用 GainNode 控制音量。
-  var gainNode = null;
-  function routeThroughWebAudio() {
-    if (!actx) return false;
-    // 关键: AudioContext 处于 suspended 时接入 MediaElementSource,
-    // 音频会被挂起 -> 表现就是"进度条在走但没声音"。
-    // 所以只在 context 已经是 running 时才接入。
-    if (actx.state !== "running") {
-      try { actx.resume(); } catch (e) { /* ignore */ }
-      if (actx.state !== "running") return false;
+function routeWhenReady() {
+  if (!actx) return;
+  if (actx.state === "running") { route(); return; }
+  try { actx.resume(); } catch (e) {}
+  try {
+    actx.addEventListener("statechange", function () {
+      if (actx.state === "running") route();
+    }, { once: true });
+  } catch (e) {}
+  setTimeout(function () { if (actx.state === "running") route(); }, 250);
+  setTimeout(function () { if (actx.state === "running") route(); }, 800);
+}
+
+["touchstart", "mousedown", "keydown", "pointerdown"].forEach(function (ev) {
+  document.addEventListener(ev, unlock, { passive: true });
+});
+
+function toggle() {
+  unlock();
+  if (au.paused) {
+    clearErr();
+    var p;
+    try { p = au.play(); } catch (e) { p = Promise.reject(e); }
+    if (p && p.catch) {
+      p.catch(function (err) {
+        var n = (err && err.name) ? err.name : "Error";
+        showErr("播放失败 (" + n + ")，请再点一次。");
+      });
     }
-    try {
-      if (au._srcSetByUser) return true;   // 已经接过了
-      var src = au.createMediaElementSource(au);
-      gainNode = actx.createGain();
-      gainNode.gain.value = 1.0;
-      src.connect(gainNode);
-      gainNode.connect(actx.destination);
-      au._srcSetByUser = true;
-      return true;
-    } catch (e) {
-      // 失败(比如重复连接)就退回直接输出, 不影响基本功能
-      return false;
-    }
+    routeWhenReady();
+  } else {
+    au.pause();
   }
+}
+playBtn.addEventListener("click", toggle);
 
-  // resume() 是异步的: 调用后 state 要过一会儿才变成 running。
-  // 监听 statechange, 一旦 running 就立刻把 <audio> 接进 Web Audio,
-  // 这样安卓浏览器能拿到音频焦点 (解决"进度条走但没声音")。
-  function routeWhenReady() {
-    if (!actx) return;
-    if (actx.state === "running") { routeThroughWebAudio(); return; }
-    try { actx.resume(); } catch (e) { /* ignore */ }
-    if (actx.addEventListener) {
-      actx.addEventListener("statechange", function () {
-        if (actx.state === "running") routeThroughWebAudio();
-      }, { once: true });
-    }
-    // 兜底: 某些实现不触发 statechange
-    setTimeout(function () { if (actx.state === "running") routeThroughWebAudio(); }, 250);
-    setTimeout(function () { if (actx.state === "running") routeThroughWebAudio(); }, 800);
+function step(dir) {
+  if (!playlist.length) {
+    if (dir < 0) { au.currentTime = 0; au.play(); }
+    return;
   }
+  var i = playlist.findIndex(function (s) { return s.id === shortId; });
+  if (i < 0) i = 0;
+  var n = (i + dir + playlist.length) % playlist.length;
+  loadTrack(playlist[n]);
+}
+prevBtn.addEventListener("click", function () { step(-1); });
+nextBtn.addEventListener("click", function () { step(1); });
 
-  // 首次用户交互时: 解锁 + 接入 Web Audio
-  ["touchstart", "mousedown", "keydown", "pointerdown"].forEach(function (ev) {
-    document.addEventListener(ev, function () {
-      unlock();
-      routeThroughWebAudio();
-    }, { passive: true });
-  });
+function ratioFromEvent(e) {
+  var r = bar.getBoundingClientRect();
+  var cx = e.clientX;
+  if (cx === undefined || cx === null) {
+    if (e.touches && e.touches.length) cx = e.touches[0].clientX;
+    else if (e.changedTouches && e.changedTouches.length) cx = e.changedTouches[0].clientX;
+  }
+  if (cx === undefined || cx === null) return 0;
+  var v = (cx - r.left) / r.width;
+  return Math.max(0, Math.min(1, v));
+}
+function paint(ratio) { fill.style.width = (Math.max(0, Math.min(1, ratio)) * 100) + "%"; }
 
-  function begin() {
-    if (autoFlag === "0") {
-      title.textContent = "准备就绪";
-      btn.classList.remove("hidden");
-      hint.innerHTML = "已关闭自动播放，点按钮开始。";
+function seekTo(ratio) {
+  if (!au.duration || !isFinite(au.duration)) return;
+  var t = ratio * au.duration;
+  try { au.currentTime = t; } catch (err) {}
+  paint(ratio);
+  curEl.textContent = fmt(t);
+}
+
+function startScrub(e) {
+  if (!au.duration || !isFinite(au.duration)) return;
+  scrubbing = true;
+  bar.classList.add("active");
+  var ratio = ratioFromEvent(e);
+  scrubTime = ratio * au.duration;
+  paint(ratio);
+  curEl.textContent = fmt(scrubTime);
+  if (e.cancelable) e.preventDefault();
+}
+
+function moveScrub(e) {
+  if (!scrubbing) return;
+  var ratio = ratioFromEvent(e);
+  if (au.duration && isFinite(au.duration)) scrubTime = ratio * au.duration;
+  paint(ratio);
+  curEl.textContent = fmt(scrubTime);
+  if (e.cancelable) e.preventDefault();
+}
+
+function endScrub(e) {
+  if (!scrubbing) return;
+  scrubbing = false;
+  bar.classList.remove("active");
+  if (au.duration && isFinite(au.duration) && isFinite(scrubTime)) {
+    seekTo(scrubTime / au.duration);
+  }
+  if (e && e.cancelable) e.preventDefault();
+}
+
+// pointer 事件统一处理鼠标+触摸; 再补 click 兜底
+bar.addEventListener("pointerdown", startScrub);
+window.addEventListener("pointermove", moveScrub);
+window.addEventListener("pointerup", endScrub);
+window.addEventListener("pointercancel", endScrub);
+bar.addEventListener("mousedown", function (e) {
+  if (e.pointerType) return;   // pointer 事件已处理
+  startScrub(e);
+});
+bar.addEventListener("touchstart", function (e) {
+  if (e.pointerType) return;
+  startScrub(e);
+}, { passive: false });
+window.addEventListener("mousemove", moveScrub);
+window.addEventListener("touchmove", moveScrub, { passive: false });
+window.addEventListener("mouseup", endScrub);
+window.addEventListener("touchend", endScrub);
+
+// 单击进度条直接跳转
+bar.addEventListener("click", function (e) {
+  if (!scrubbing && au.duration && isFinite(au.duration)) {
+    seekTo(ratioFromEvent(e));
+  }
+});au.addEventListener("timeupdate", function () {
+  if (scrubbing) return;
+  curEl.textContent = fmt(au.currentTime);
+  if (au.duration && isFinite(au.duration)) paint(au.currentTime / au.duration);
+});
+au.addEventListener("loadedmetadata", function () {
+  durEl.textContent = fmt(au.duration);
+});
+au.addEventListener("play", function () { setPlaying(true); });
+au.addEventListener("pause", function () { setPlaying(false); });
+au.addEventListener("ended", function () {
+  setPlaying(false);
+  paint(0);
+  curEl.textContent = "0:00";
+  if (playlist.length) step(1);
+});
+au.addEventListener("error", function () {
+  if (au.error && au.error.code === au.error.MEDIA_ERR_ABORTED) return;
+  if (au.error && (au.error.code === au.error.MEDIA_ERR_DECODE ||
+                     au.error.code === au.error.MEDIA_ERR_SRC_NOT_SUPPORTED ||
+                     au.error.code === au.error.MEDIA_ERR_NETWORK)) {
+    if (candIdx < candidates.length) { tryNext(); return; }
+    showErr("音频加载失败，请检查网络后重试。");
+  }
+});
+
+function tryNext() {
+  if (candIdx >= candidates.length) {
+    showErr("所有音频源都不可用，请检查网络。");
+    return;
+  }
+  au.src = candidates[candIdx++];
+  au.load();
+}
+
+function loadTrack(track) {
+  shortId = track.id;
+  trackName = track.title || "";
+  trackArtist = track.artist || "";
+  titleEl.textContent = trackName || "未知歌曲";
+  artistEl.textContent = trackArtist || "";
+  if (track.cover) img.src = track.cover;
+  candidates = String(track.url || "").split("|").map(function (u) { return u.trim(); }).filter(Boolean);
+  candIdx = 0;
+  clearErr();
+  paint(0);
+  curEl.textContent = "0:00";
+  durEl.textContent = "--:--";
+  if (!candidates.length) { showErr("没有音频地址。"); return; }
+  tryNext();
+}
+
+function applyConfig(cfg) {
+  playlist = cfg.songs || [];
+  if (directSrc) {
+    loadTrack({ id: shortId || "d", title: cfg.title || "", url: directSrc });
+    return;
+  }
+  var hit = null;
+  for (var i = 0; i < playlist.length; i++) {
+    if (playlist[i].id === shortId) { hit = playlist[i]; break; }
+  }
+  if (!hit) {
+    if (playlist.length === 1) { hit = playlist[0]; }
+    else {
+      showErr("没有找到 id=\"" + shortId + "\"。可用: " +
+             playlist.map(function (s) { return s.id; }).join(", "));
       return;
     }
-    // 给浏览器一点时间完成音频缓冲，再尝试自动播放
-    start();
-    setTimeout(function () {
-      if (au.paused) { au.play().catch(function () {}); }
-    }, 300);
   }
+  loadTrack(hit);
+}
 
-  resolve(function (srcUrl, name) {
-    loadSource(srcUrl, name);
-    begin();
-  });
+var CFG_PATHS = ["config.json", "site/config.json", "./config.json"];
+function loadConfig() {
+  var i = 0;
+  function next() {
+    if (i >= CFG_PATHS.length) { showErr("读取 config.json 失败。"); return; }
+    fetch(CFG_PATHS[i++], { cache: "no-cache" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(applyConfig)
+      .catch(function () { next(); });
+  }
+  next();
+}
+
+function autoplay() {
+  var p;
+  try { p = au.play(); } catch (e) { p = Promise.reject(e); }
+  if (p && p.catch) {
+    p.catch(function (err) {
+      var n = (err && err.name) ? err.name : "Error";
+      if (n === "NotAllowedError") {
+        hint.innerHTML = "浏览器拦截了自动播放。<br>点上面的 ▶ 按钮即可开始播放。";
+      }
+    });
+  }
+}
+
+fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
+  .then(function (r) { return r.ok ? r.text() : null; })
+  .then(function (t) {
+    if (t && t.trim() && t.trim() !== "20261115-4") {
+      hint.innerHTML = "检测到新版本 (" + t.trim() + ")，当前是旧缓存。<br>请下拉刷新。";
+    }
+  })
+  .catch(function () {});
+
+loadConfig();
+setTimeout(autoplay, 400);
+
 })();
 </script>
 </body>
