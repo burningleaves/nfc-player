@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NFC 碰一碰 · 播放</title>
+<title>NFC 碰一碰 · 播放 <span id="ver" style="font-size:11px;opacity:.5"></span></title>
 <style>
   :root{
     --bg:#0f1115; --fg:#e8eaf0; --dim:#9aa3b2; --accent:#4f8cff; --card:#181b22;
@@ -96,6 +96,33 @@
   var errBox = document.getElementById("err");
   var hint   = document.getElementById("hint");
 
+  // ---- 版本号 ----------------------------------------------------------
+  // 改代码后 bump 这个号, 方便确认手机跑的是哪一版 (也强制绕过缓存)
+  var BUILD = "20261115-2";
+  (function () {
+    try {
+      var v = document.getElementById("ver");
+      if (v) v.textContent = BUILD;
+    } catch (e) { /* ignore */ }
+  })();
+
+  // 缓存自检: 拉一份带随机参数的 config.json, 看服务器上的版本是否比本页新。
+  // 若新, 提示用户强制刷新 (手机浏览器很容易缓存旧 HTML)。
+  (function () {
+    try {
+      fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.text() : null; })
+        .then(function (t) {
+          if (!t) return;
+          if (t.trim() && t.trim() !== BUILD) {
+            hint.innerHTML = "检测到新版本 (" + t.trim() + ")，当前页面是旧缓存。<br>" +
+              "请下拉刷新页面, 或在地址栏加 &r=" + Date.now() + " 重新打开。";
+            hint.style.color = "#ffb454";
+          }
+        })
+        .catch(function () { /* ignore */ });
+    } catch (e) { /* ignore */ }
+  })();
   // ---- 取参数 ----------------------------------------------------------
   var qs = new URLSearchParams(location.search);
   // src 可以放在 ?src= ，也允许标签直接指向音频直链（此时用落地页包一层）

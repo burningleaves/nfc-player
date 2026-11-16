@@ -34,7 +34,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-PAIRS = [("site/index.html", "index.html"), ("site/config.json", "config.json")]
+PAIRS = [("site/index.html", "index.html"), ("site/config.json", "config.json"),
+         ("site/version.txt", "version.txt")]
 
 
 def main() -> int:

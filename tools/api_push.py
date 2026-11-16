@@ -124,7 +124,7 @@ def collect_files():
                     continue
                 files[rel] = open(fp, 'rb').read()
     for f in ('README.md', 'vercel.json', '.gitignore', '.gitattributes',
-              'index.html', 'config.json'):
+              'index.html', 'config.json', 'version.txt'):
         fp = os.path.join(ROOT, f)
         if os.path.isfile(fp):
             files[f] = open(fp, 'rb').read()
