@@ -118,7 +118,7 @@ def collect_files():
             for f in fn:
                 fp = os.path.join(dp, f)
                 rel = os.path.relpath(fp, ROOT).replace(os.sep, '/')
-                if rel.endswith(('.pyc', '.ndef')):
+                if rel.endswith(('.pyc', '.ndef')) or rel.split('/')[-1].startswith('t.'):
                     continue
                 if rel.startswith('site/') and rel.endswith('.wav'):
                     continue

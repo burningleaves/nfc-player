@@ -61,11 +61,11 @@
   }
   .btn:active{transform:scale(.9);}
   .btn svg{width:26px; height:26px; fill:currentColor;}
-  .btn.main{
+  .btn.main{ position:relative;
     width:64px; height:64px; background:var(--accent); color:#fff;
     box-shadow:0 8px 24px rgba(79,140,255,.34);
   }
-  .btn.main svg{width:30px; height:30px;}
+  .btn.main svg{width:30px; height:30px; position:absolute;}  .btn.main .i-pause{display:none;}  .btn.main.playing .i-play{display:none;}  .btn.main.playing .i-pause{display:block;}
   .btn:disabled{opacity:.35;}
   .hint{color:var(--dim); font-size:12px; text-align:center; margin-top:16px; line-height:1.6;}
   .err{color:#ff6b6b; font-size:13px; text-align:center; margin-top:12px; display:none; line-height:1.6;}
@@ -90,7 +90,7 @@
       <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 6v12z"/></svg>
     </button>
     <button class="btn main" id="play" aria-label="播放">
-      <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>      <svg class="i-pause" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
     </button>
     <button class="btn" id="next" aria-label="下一首">
       <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
@@ -146,17 +146,16 @@ function showErr(m) { errBox.textContent = m; errBox.classList.add("show"); }
 function clearErr() { errBox.classList.remove("show"); errBox.textContent = ""; }
 
 function setIcon(on) {
-  playIcon.setAttribute("d", on ? ICON_PAUSE : ICON_PLAY);
+  // 用 CSS 类控制, 不直接改 path 的 d 属性 —— 更可靠
+  playBtn.classList.toggle("playing", !!on);
   playBtn.setAttribute("aria-label", on ? "暂停" : "播放");
 }
 
 function setPlaying(on) {
-  playing = on;
+  playing = !!on;
   setIcon(on);
-  cover.classList.toggle("spin", on);
-}
-
-function showDiag() {
+  try { cover.classList.toggle("spin", playing); } catch (e) {}
+}function showDiag() {
   if (!diagEl) return;
   var b = [];
   b.push("st=" + au.readyState);
