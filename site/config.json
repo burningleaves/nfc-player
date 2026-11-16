@@ -1,12 +1,12 @@
 {
-  "site": "https://burningleaves.github.io/nfc-player",
+  "site": "http://127.0.0.1:8906",
   "songs": [
     {
       "id": "love",
       "title": "爱情悬崖",
       "artist": "周杰伦 · 叶惠美",
       "cover": "cover.jpg",
-      "url": "https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.m4a|https://raw.githubusercontent.com/burningleaves/nfc-player/main/audio/love-cliff.aac|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.m4a|https://gcore.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac|https://cdn.jsdelivr.net/gh/burningleaves/nfc-player@main/audio/love-cliff.aac"
+      "url": "http://127.0.0.1:8906/t.m4a"
     }
   ]
 }

@@ -216,10 +216,15 @@ function routeWhenReady() {
   document.addEventListener(ev, unlock, { passive: true });
 });
 
+function clearHint() {
+  if (hint) { hint.innerHTML = ""; hint.removeAttribute("style"); }
+}
+
 function toggle() {
   unlock();
   if (au.paused) {
     clearErr();
+    clearHint();
     var p;
     try { p = au.play(); } catch (e) { p = Promise.reject(e); }
     if (p && p.catch) {
@@ -232,8 +237,7 @@ function toggle() {
   } else {
     au.pause();
   }
-}
-playBtn.addEventListener("click", toggle);
+}playBtn.addEventListener("click", toggle);
 
 function step(dir) {
   if (!playlist.length) {
@@ -330,7 +334,7 @@ bar.addEventListener("click", function (e) {
 au.addEventListener("loadedmetadata", function () {
   durEl.textContent = fmt(au.duration);
 });
-au.addEventListener("play", function () { setPlaying(true); });
+au.addEventListener("play", function () { setPlaying(true); clearHint(); });
 au.addEventListener("pause", function () { setPlaying(false); });
 au.addEventListener("ended", function () {
   setPlaying(false);
