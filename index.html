@@ -131,6 +131,7 @@ var directSrc = qs.get("src") || "";
 var candidates = [], candIdx = 0, trackName = "", trackArtist = "";
 var playing = false, actx = null, gainNode = null;
 var scrubbing = false, scrubTime = 0;
+var loadTimer = null;
 var playlist = [];
 
 var ICON_PLAY = "M8 5v14l11-7z";
@@ -330,9 +331,6 @@ bar.addEventListener("click", function (e) {
   curEl.textContent = fmt(au.currentTime);
   if (au.duration && isFinite(au.duration)) paint(au.currentTime / au.duration);
 });
-au.addEventListener("loadedmetadata", function () {
-  durEl.textContent = fmt(au.duration);
-});
 au.addEventListener("play", function () { setPlaying(true); clearHint(); });
 au.addEventListener("pause", function () { setPlaying(false); });
 au.addEventListener("ended", function () {
@@ -341,7 +339,34 @@ au.addEventListener("ended", function () {
   curEl.textContent = "0:00";
   if (playlist.length) step(1);
 });
+
+function tryNext() {
+  if (candIdx >= candidates.length) {
+    showErr("所有音频源都不可用，请检查网络后重试。");
+    setPlaying(false);
+    return;
+  }
+  var url = candidates[candIdx++];
+  au.src = url;
+  // 超时保护: 某个源卡住(网络抖动/CDN 超时)时, 4 秒内没起效就换下一个,
+  // 避免整个播放器干等十几秒。
+  var myIdx = candIdx;
+  if (loadTimer) { clearTimeout(loadTimer); }
+  loadTimer = setTimeout(function () {
+    if (myIdx === candIdx && au.readyState < 2) {
+      tryNext();
+    }
+  }, 4000);
+  try {
+    au.load();
+  } catch (e) {
+    tryNext();
+  }
+}
+
+// 加载失败: 清掉超时定时器并换下一个源
 au.addEventListener("error", function () {
+  if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
   if (au.error && au.error.code === au.error.MEDIA_ERR_ABORTED) return;
   if (au.error && (au.error.code === au.error.MEDIA_ERR_DECODE ||
                      au.error.code === au.error.MEDIA_ERR_SRC_NOT_SUPPORTED ||
@@ -351,14 +376,11 @@ au.addEventListener("error", function () {
   }
 });
 
-function tryNext() {
-  if (candIdx >= candidates.length) {
-    showErr("所有音频源都不可用，请检查网络。");
-    return;
-  }
-  au.src = candidates[candIdx++];
-  au.load();
-}
+// 成功加载后清掉超时定时器
+au.addEventListener("loadedmetadata", function () {
+  if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
+  durEl.textContent = fmt(au.duration);
+});
 
 function loadTrack(track) {
   shortId = track.id;
@@ -427,7 +449,7 @@ function autoplay() {
 fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
   .then(function (r) { return r.ok ? r.text() : null; })
   .then(function (t) {
-    if (t && t.trim() && t.trim() !== "20261115-4") {
+    if (t && t.trim() && t.trim() !== "20261115-5") {
       hint.innerHTML = "检测到新版本 (" + t.trim() + ")，当前是旧缓存。<br>请下拉刷新。";
     }
   })
